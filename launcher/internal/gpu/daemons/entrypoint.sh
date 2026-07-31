@@ -3,8 +3,26 @@
 # Exit on error
 set -e
 
-echo "Starting guest GPU daemon service [590.48.01]..." | tee /dev/console
-export LD_LIBRARY_PATH=/opt/nvidia-host/590.48.01/lib64:$LD_LIBRARY_PATH
+mount_overlay() {
+    local target="$1"
+    local upper
+    local work
+    if [[ -d "${target}" ]]; then
+        upper=$(mktemp -d)
+        work=$(mktemp -d)
+        mount -t overlay -o "rw,noexec,nosuid,nodev,lowerdir=${target},upperdir=${upper},workdir=${work}" none "${target}"
+    fi
+}
+
+mount -t tmpfs -o rw,noexec,nosuid,nodev none /tmp
+mount -t tmpfs -o rw,noexec,nosuid,nodev none /var/tmp
+mount -t tmpfs -o rw,noexec,nosuid,nodev none /var/log
+mount -t tmpfs -o rw,noexec,nosuid,nodev none /var/lib
+mount -t tmpfs -o rw,noexec,nosuid,nodev none /var/cache
+mount_overlay /usr/share/nvidia
+
+echo "Starting guest GPU daemon service [595.58.03]..." | tee /dev/console
+export LD_LIBRARY_PATH=/opt/nvidia-host/595.58.03/lib64:$LD_LIBRARY_PATH
 
 # Modify config
 sed -i 's/PARTITION_RAIL_POLICY=greedy/PARTITION_RAIL_POLICY=symmetric/' /usr/share/nvidia/nvswitch/fabricmanager.cfg
