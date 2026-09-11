@@ -1,8 +1,10 @@
 package internal
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/go-tpm-tools/internal/test"
@@ -72,5 +74,45 @@ func TestGetAKIntermediateCertsSucceeds(t *testing.T) {
 	}
 	if len(certChain) != 2 {
 		t.Fatalf("GetAKIntermediateCerts did not return the expected number of certificates: got %v, want 2", len(certChain))
+	}
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	closed bool
+}
+
+func (t *trackingReadCloser) Close() error {
+	t.closed = true
+	return nil
+}
+
+type trackingTransport struct {
+	body *trackingReadCloser
+}
+
+func (t *trackingTransport) RoundTrip(_ *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       t.body,
+		Header:     make(http.Header),
+	}, nil
+}
+
+func TestFetchIssuingCertificateClosesBodyOnNonOKStatus(t *testing.T) {
+	testCA, caKey := test.GetTestCert(t, nil, nil, nil)
+	leafCert, _ := test.GetTestCert(t, []string{"http://example.com/cert"}, testCA, caKey)
+
+	body := &trackingReadCloser{Reader: strings.NewReader("not found")}
+	client := &http.Client{
+		Transport: &trackingTransport{body: body},
+	}
+
+	_, err := fetchIssuingCertificate(client, leafCert)
+	if err == nil {
+		t.Fatal("expected error on non-OK status")
+	}
+	if !body.closed {
+		t.Error("expected resp.Body to be closed when status code is not OK")
 	}
 }

@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -945,5 +946,27 @@ func TestGetMonitoringPolicyErrors(t *testing.T) {
 				t.Errorf("Expected getMonitoringPolicy to return error, returned successfully with policy %v", policy)
 			}
 		})
+	}
+}
+
+func TestVerifyEnvVarErrorDoesNotLeakValue(t *testing.T) {
+	policy := LaunchPolicy{
+		AllowedEnvOverride: []string{"ALLOWED_VAR"},
+	}
+	secretVal := "super_secret_token_12345"
+	spec := LaunchSpec{
+		Envs: []EnvVar{
+			{Name: "DISALLOWED_VAR", Value: secretVal},
+		},
+	}
+	err := policy.Verify(spec)
+	if err == nil {
+		t.Fatal("expected policy.Verify to fail for disallowed env var")
+	}
+	if strings.Contains(err.Error(), secretVal) {
+		t.Errorf("error message leaked secret env value: %v", err)
+	}
+	if !strings.Contains(err.Error(), "DISALLOWED_VAR") {
+		t.Errorf("error message should contain env var name: %v", err)
 	}
 }

@@ -40,7 +40,9 @@ func TestConvertEmpty(t *testing.T) {
 	if _, err := convertChallengeFromREST(&ccpb.Challenge{}); err != nil {
 		t.Errorf("Converting empty challenge: %v", err)
 	}
-	_ = convertRequestToREST(verifier.VerifyAttestationRequest{})
+	if _, err := convertRequestToREST(verifier.VerifyAttestationRequest{}); err != nil {
+		t.Errorf("Converting empty request: %v", err)
+	}
 	if _, err := convertResponseFromREST(&ccpb.VerifyAttestationResponse{}); err != nil {
 		t.Errorf("Converting empty challenge: %v", err)
 	}
@@ -819,7 +821,10 @@ func TestConvertCSRequestToREST(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotReq := convertCSRequestToREST(tc.verifierReq)
+			gotReq, err := convertCSRequestToREST(tc.verifierReq)
+			if err != nil {
+				t.Fatalf("convertCSRequestToREST failed: %v", err)
+			}
 			if diff := cmp.Diff(gotReq, tc.expectedReq, cmpOpts...); diff != "" {
 				t.Errorf("convertCSRequestToREST returned unexpected output (-got, +want): %v", diff)
 			}
@@ -845,3 +850,34 @@ func TestConvertCSResponseFromREST(t *testing.T) {
 		t.Errorf("convertCSResponseFromREST(%v) did not return expected output(-got, +want): %v", csResp, diff)
 	}
 }
+
+func TestConvertRequestToREST_MalformedAttestationReturnsError(t *testing.T) {
+	// Malformed TDX quote should return an error instead of crashing the process via log.Fatalf
+	reqTDX := verifier.VerifyAttestationRequest{
+		Attestation: &attestpb.Attestation{
+			TeeAttestation: &attestpb.Attestation_TdxAttestation{
+				TdxAttestation: &tpb.QuoteV4{},
+			},
+		},
+	}
+	_, err := convertRequestToREST(reqTDX)
+	if err == nil {
+		t.Fatal("expected error converting malformed TDX quote, got nil")
+	}
+
+	// Malformed SEV-SNP attestation should return an error instead of crashing the process via log.Fatalf
+	reqSNP := verifier.VerifyAttestationRequest{
+		Attestation: &attestpb.Attestation{
+			TeeAttestation: &attestpb.Attestation_SevSnpAttestation{
+				SevSnpAttestation: &spb.Attestation{
+					Report: &spb.Report{},
+				},
+			},
+		},
+	}
+	_, err = convertRequestToREST(reqSNP)
+	if err == nil {
+		t.Fatal("expected error converting malformed SEV-SNP report, got nil")
+	}
+}
+

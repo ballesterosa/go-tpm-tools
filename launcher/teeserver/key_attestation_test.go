@@ -493,3 +493,43 @@ func TestRemoteBindingKeyAttester_GetKeyEndorsement(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKeyEndorsementNilKeyHandle(t *testing.T) {
+	ctx := context.Background()
+	req := &tspb.GetKeyEndorsementRequest{
+		Challenge: []byte("challenge"),
+		KeyHandle: nil,
+	}
+
+	t.Run("localKEMAttester", func(t *testing.T) {
+		attester := newLocalKEMAttester(&fakeClaimsProvider{}, mockAttestationAgent{})
+		_, err := attester.GetKeyEndorsement(ctx, req, agent.AttestAgentOpts{})
+		if err == nil {
+			t.Fatal("expected error for nil KeyHandle")
+		}
+	})
+
+	t.Run("remoteKEMAttester", func(t *testing.T) {
+		attester := &remoteKEMAttester{}
+		_, err := attester.GetKeyEndorsement(ctx, req, agent.AttestAgentOpts{})
+		if err == nil {
+			t.Fatal("expected error for nil KeyHandle")
+		}
+	})
+
+	t.Run("localBindingKeyAttester", func(t *testing.T) {
+		attester := newLocalBindingKeyAttester(&fakeClaimsProvider{}, mockAttestationAgent{})
+		_, err := attester.GetKeyEndorsement(ctx, req, agent.AttestAgentOpts{})
+		if err == nil {
+			t.Fatal("expected error for nil KeyHandle")
+		}
+	})
+
+	t.Run("bcBindingKeyAttester", func(t *testing.T) {
+		attester := &bcBindingKeyAttester{}
+		_, err := attester.GetKeyEndorsement(ctx, req, agent.AttestAgentOpts{})
+		if err == nil {
+			t.Fatal("expected error for nil KeyHandle")
+		}
+	})
+}
